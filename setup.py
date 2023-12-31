@@ -885,6 +885,9 @@ class PyBuildExt(build_ext):
         openssl_ver = 0
         openssl_ver_re = re.compile(
             '^\s*#\s*define\s+OPENSSL_VERSION_NUMBER\s+(0x[0-9a-fA-F]+)' )
+        openssl_ver_parts_re = re.compile(
+            '^\s*#\s*define\s+OPENSSL_VERSION_' +
+            '((?:MAJOR)|(?:MINOR)|(?:PATCH))\s+([0-9]+)')
 
         # look for the openssl version header on the compiler search path.
         opensslv_h = find_file('openssl/opensslv.h', [],
@@ -895,10 +898,21 @@ class PyBuildExt(build_ext):
                 name = os.path.join(macosx_sdk_root(), name[1:])
             try:
                 incfile = open(name, 'r')
+                openssl_ver_parts = {}
                 for line in incfile:
                     m = openssl_ver_re.match(line)
                     if m:
                         openssl_ver = eval(m.group(1))
+                    m = openssl_ver_parts_re.match(line)
+                    if m:
+                        openssl_ver_parts[m.group(1)] = eval(m.group(2))
+                if openssl_ver == 0 and openssl_ver_parts:
+                    try:
+                        openssl_ver = (openssl_ver_parts['MAJOR'] << 28
+                                       | openssl_ver_parts['MINOR'] << 20
+                                       | openssl_ver_parts['PATCH'] << 4)
+                    except KeyError:
+                        pass
             except IOError, msg:
                 print "IOError while reading opensshv.h:", msg
                 pass
